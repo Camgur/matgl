@@ -275,9 +275,9 @@ def _create_directed_line_graph(
         total_edges_per_bond = num_edges_per_bond.sum()
 
         # apply an adaptive buffer of at least 8 extra allocations (or 1% of total edges per bond)
-        buffered_edges = max(8, int(0.01 * total_edges_per_bond)) + total_edges_per_bond  # small safety margin
-        lg_src = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
-        lg_dst = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        buffered_edges = max(8, int(0.01 * total_edges_per_bond))
+        lg_src = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_dst = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
 
         incoming_edges = src_indices.unsqueeze(1) == dst_indices
         is_self_edge = src_indices == dst_indices
