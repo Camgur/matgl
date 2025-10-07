@@ -272,8 +272,12 @@ def _create_directed_line_graph(
         all_indices = torch.arange(graph.number_of_nodes(), device=graph.device).unsqueeze(dim=0)
         num_bonds_per_atom = torch.count_nonzero(src_indices.unsqueeze(dim=1) == all_indices, dim=0)
         num_edges_per_bond = (num_bonds_per_atom - 1).repeat_interleave(num_bonds_per_atom)
-        lg_src = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
-        lg_dst = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        total_edges_per_bond = num_edges_per_bond.sum()
+
+        # apply an adaptive buffer of at least 8 extra allocations (or 1% of total edges per bond)
+        buffered_edges = max(8, int(0.01 * total_edges_per_bond)) + total_edges_per_bond  # small safety margin to catch overallocations
+        lg_src = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_dst = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
 
         incoming_edges = src_indices.unsqueeze(1) == dst_indices
         is_self_edge = src_indices == dst_indices
@@ -298,7 +302,10 @@ def _create_directed_line_graph(
         edge_inds_ns = not_self_edge.nonzero().squeeze()
         lg_src_ns = incoming[not_self_edge].nonzero()[:, 1].squeeze()
         lg_dst_ns = edge_inds_ns.repeat_interleave(num_edges_per_bond[not_self_edge])
-        lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+
+        # fill remaining unallocated space
+        n_xs = lg_dst_ns.numel()
+        lg_src[n:n + n_xs], lg_dst[n:n + n_xs] = lg_src_ns, lg_dst_ns
 
         # Patch to ensure alignment
         # Trims unused or overfilled arrays
