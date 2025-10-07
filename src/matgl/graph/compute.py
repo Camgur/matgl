@@ -274,7 +274,7 @@ def _create_directed_line_graph(
         num_edges_per_bond = (num_bonds_per_atom - 1).repeat_interleave(num_bonds_per_atom)
         total_edges_per_bond = num_edges_per_bond.sum()
 
-        # apply an adaptive buffer of at least 8 extra allocations (or 1% of total edges per bond)
+        # apply an adaptive buffer of at least 8 extra allocations
         buffered_edges = max(8, int(0.01 * total_edges_per_bond))
         lg_src = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
         lg_dst = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
@@ -305,7 +305,7 @@ def _create_directed_line_graph(
 
         # fill remaining unallocated space
         n_xs = lg_dst_ns.numel()
-        lg_src[n:n + n_xs], lg_dst[n:n + n_xs] = lg_src_ns, lg_dst_ns
+        lg_src[n : n + n_xs], lg_dst[n : n + n_xs] = lg_src_ns, lg_dst_ns
 
         # Patch to ensure alignment
         # Trims unused or overfilled arrays
