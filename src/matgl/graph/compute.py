@@ -299,6 +299,15 @@ def _create_directed_line_graph(
         lg_src_ns = incoming[not_self_edge].nonzero()[:, 1].squeeze()
         lg_dst_ns = edge_inds_ns.repeat_interleave(num_edges_per_bond[not_self_edge])
         lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+
+        # Patch to ensure alignment
+        # Trims unused or overfilled arrays
+        n_filled = min(lg_src.numel(), max(n + lg_dst_ns.numel(), 0))
+        if n_filled < lg_src.numel():
+            lg_src = lg_src[:n_filled]
+            lg_dst = lg_dst[:n_filled]
+
+        # Build line graph
         lg = dgl.graph((lg_src, lg_dst))
 
         for key in graph.edata:
