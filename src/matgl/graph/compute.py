@@ -131,7 +131,7 @@ def create_line_graph(
             g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff
         )
         lg = (
-            _create_directed_line_graph(graph_with_three_body, mismatch_handling=False)
+            _create_directed_line_graph(graph_with_three_body, mismatch_handling=error_handling)
             if directed
             else _compute_3body(graph_with_three_body)
         )
@@ -261,12 +261,13 @@ def _compute_3body(g: dgl.DGLGraph):
 
 def _create_directed_line_graph(
     graph: dgl.DGLGraph,
-    mismatch_handling=True,
+    mismatch_handling: bool = True,
 ) -> dgl.DGLGraph:
     """Creates a line graph from a graph, considers periodic boundary conditions.
 
     Args:
         graph: DGL graph representing atom graph
+        mismatch_handling: passthrough from error_handling, allows tensor reallocation
 
     Returns:
         line_graph: DGL line graph of pruned graph to three body cutoff
