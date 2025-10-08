@@ -341,8 +341,8 @@ class CHGNet(MatGLModel):
             l_g (dgl.DGLGraph, optional): Line graph. Defaults to None and is computed internally.
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
-            tensor_handling: whether to handle tensor reallocation due to mismatch in tensor preallocation.
-                Defaults to True.
+            tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
+            preallocation. Defaults to True.
 
         Returns:
             torch.Tensor: Model output.
@@ -366,8 +366,13 @@ class CHGNet(MatGLModel):
         # create bond graph (line graph) with necessary node and edge data
         if self.use_bond_graph:
             if l_g is None:
-                bond_graph = create_line_graph(g, self.three_body_cutoff, directed=True, 
-                                               error_handling=error_handling, tensor_handling=tensor_handling)
+                bond_graph = create_line_graph(
+                    g,
+                    self.three_body_cutoff,
+                    directed=True,
+                    error_handling=error_handling,
+                    tensor_handling=tensor_handling
+                    )
             else:
                 # need to ensure the line graph matches the graph
                 bond_graph = ensure_line_graph_compatibility(g, l_g, self.three_body_cutoff, directed=True)
@@ -448,8 +453,8 @@ class CHGNet(MatGLModel):
             graph_converter: Object that implements a get_graph_from_structure.
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
-            tensor_handling: whether to handle tensor reallocation due to mismatch in tensor preallocation.
-                Defaults to True.
+            tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
+            preallocation. Defaults to True.
 
         Returns:
             output (torch.tensor): output property
@@ -464,5 +469,9 @@ class CHGNet(MatGLModel):
         graph.ndata["pos"] = graph.ndata["frac_coords"] @ lattice[0]
         if state_feats is None:
             state_feats = torch.tensor(state_feats_default)
-        return self(g=graph, state_attr=state_feats, 
-                    error_handling=error_handling, tensor_handling=tensor_handling)
+        return self(
+            g=graph,
+            state_attr=state_feats,
+            error_handling=error_handling,
+            tensor_handling=tensor_handling
+            )
