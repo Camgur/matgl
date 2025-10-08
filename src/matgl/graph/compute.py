@@ -274,8 +274,9 @@ def _create_directed_line_graph(
         num_edges_per_bond = (num_bonds_per_atom - 1).repeat_interleave(num_bonds_per_atom)
         total_edges_per_bond = num_edges_per_bond.sum()
 
-        # apply an adaptive buffer of twenty-five percent
-        buffered_edges = max(10, int(0.25 * total_edges_per_bond))
+        # apply an adaptive buffer of ten percent
+        # this will be trimmed, little efficiency impact
+        buffered_edges = max(10, int(0.10 * total_edges_per_bond))
         lg_src = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
         lg_dst = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
 
@@ -304,11 +305,22 @@ def _create_directed_line_graph(
         lg_dst_ns = edge_inds_ns.repeat_interleave(num_edges_per_bond[not_self_edge])
 
         # fill remaining unallocated space
-        n_xs = lg_dst_ns.numel()
-        lg_src[n : n + n_xs], lg_dst[n : n + n_xs] = lg_src_ns, lg_dst_ns
+        # try normal fill, expand if necessary (a little slower but rare)
+        try:
+            lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+        # fixes tensor allocation crash with dynamic resizing
+        # only activates if the allocation buffer is not enough
+        except RuntimeError as e:
+            if "must match the existing size" in str(e):
+                xs = int(lg_src.numel() * 1.2)
+                lg_src = torch.cat([lg_src, torch.empty(xs - lg_src.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
+                lg_dst = torch.cat([lg_dst, torch.empty(xs - lg_dst.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
+                lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+            else:
+                raise
 
         # Patch to ensure alignment
-        # Trims unused or overfilled arrays
+        # Trims unused or overfilled arrays (fast)
         n_filled = min(lg_src.numel(), max(n + lg_dst_ns.numel(), 0))
         if n_filled < lg_src.numel():
             lg_src = lg_src[:n_filled]
