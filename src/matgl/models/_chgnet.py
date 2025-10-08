@@ -48,15 +48,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ELEMENTS = (
-    *list(DEFAULT_ELEMENTS[:83]),
-    "Po",
-    "At",
-    "Rn",
-    "Fr",
-    "Ra",
-    *list(DEFAULT_ELEMENTS[83:]),
-)
+DEFAULT_ELEMENTS = (*list(DEFAULT_ELEMENTS[:83]), "Po", "At", "Rn", "Fr", "Ra", *list(DEFAULT_ELEMENTS[83:]))
 
 
 class CHGNet(MatGLModel):
@@ -202,9 +194,7 @@ class CHGNet(MatGLModel):
             raise NotImplementedError("classification with CHGNet not yet implemented")
 
         if is_intensive:
-            raise NotImplementedError(
-                "intensive targets with CHGNet not yet implemented"
-            )
+            raise NotImplementedError("intensive targets with CHGNet not yet implemented")
 
         try:
             activation: nn.Module = ActivationFunction[activation_type].value()
@@ -222,35 +212,20 @@ class CHGNet(MatGLModel):
             )
 
         # basis expansions for bond lengths, triple interaction bond lengths and angles
-        self.bond_expansion = RadialBesselFunction(
-            max_n=max_n, cutoff=cutoff, learnable=learn_basis
-        )
+        self.bond_expansion = RadialBesselFunction(max_n=max_n, cutoff=cutoff, learnable=learn_basis)
         self.threebody_bond_expansion = (
-            RadialBesselFunction(
-                max_n=max_n, cutoff=threebody_cutoff, learnable=learn_basis
-            )
+            RadialBesselFunction(max_n=max_n, cutoff=threebody_cutoff, learnable=learn_basis)
             if self.use_bond_graph
             else None
         )
-        self.angle_expansion = (
-            FourierExpansion(max_f=max_f, learnable=learn_basis)
-            if self.use_bond_graph
-            else None
-        )
+        self.angle_expansion = FourierExpansion(max_f=max_f, learnable=learn_basis) if self.use_bond_graph else None
 
         # embedding block for atom, bond, angle, and optional state features
         self.include_states = dim_state_feats is not None
-        self.state_embedding = (
-            nn.Embedding(dim_state_feats, dim_state_embedding)
-            if self.include_states
-            else None
-        )  # type: ignore[arg-type]
+        self.state_embedding = nn.Embedding(dim_state_feats, dim_state_embedding) if self.include_states else None  # type: ignore[arg-type]
         self.atom_embedding = nn.Embedding(len(element_types), dim_atom_embedding)
         self.bond_embedding = MLP_norm(
-            [max_n, dim_bond_embedding],
-            activation=activation,
-            activate_last=non_linear_bond_embedding,
-            bias_last=False,
+            [max_n, dim_bond_embedding], activation=activation, activate_last=non_linear_bond_embedding, bias_last=False
         )
         self.angle_embedding = (
             MLP_norm(
@@ -265,19 +240,14 @@ class CHGNet(MatGLModel):
 
         # shared message bond distance smoothing weights
         self.atom_bond_weights = (
-            nn.Linear(max_n, dim_atom_embedding, bias=False)
-            if shared_bond_weights in ["bond", "both"]
-            else None
+            nn.Linear(max_n, dim_atom_embedding, bias=False) if shared_bond_weights in ["bond", "both"] else None
         )
         self.bond_bond_weights = (
-            nn.Linear(max_n, dim_bond_embedding, bias=False)
-            if shared_bond_weights in ["bond", "both"]
-            else None
+            nn.Linear(max_n, dim_bond_embedding, bias=False) if shared_bond_weights in ["bond", "both"] else None
         )
         self.threebody_bond_weights = (
             nn.Linear(max_n, dim_bond_embedding, bias=False)
-            if shared_bond_weights in ["three_body_bond", "both"]
-            and self.use_bond_graph
+            if shared_bond_weights in ["three_body_bond", "both"] and self.use_bond_graph
             else None
         )
 
@@ -315,9 +285,7 @@ class CHGNet(MatGLModel):
                         normalize_hidden=normalize_hidden,
                         bond_dropout=conv_dropout,
                         angle_dropout=conv_dropout,
-                        rbf_order=max_n
-                        if layer_bond_weights in ["three_body_bond", "both"]
-                        else 0,
+                        rbf_order=max_n if layer_bond_weights in ["three_body_bond", "both"] else 0,
                     )
                     for _ in range(num_blocks - 1)
                 ]
@@ -327,25 +295,17 @@ class CHGNet(MatGLModel):
         )
 
         self.sitewise_readout = (
-            nn.Linear(dim_atom_embedding, num_site_targets)
-            if num_site_targets > 0
-            else lambda x: None
+            nn.Linear(dim_atom_embedding, num_site_targets) if num_site_targets > 0 else lambda x: None
         )
 
-        input_dim = (
-            dim_atom_embedding if readout_field == "atom_feat" else dim_bond_embedding
-        )
+        input_dim = dim_atom_embedding if readout_field == "atom_feat" else dim_bond_embedding
         if final_mlp_type == "mlp":
             self.final_layer = MLP_norm(
-                dims=[input_dim, *final_hidden_dims, num_targets],
-                activation=activation,
-                activate_last=False,
+                dims=[input_dim, *final_hidden_dims, num_targets], activation=activation, activate_last=False
             )
         elif final_mlp_type == "gated":
             self.final_layer = GatedMLP_norm(  # type: ignore[assignment]
-                in_feats=input_dim,
-                dims=[*final_hidden_dims, num_targets],
-                activate_last=False,
+                in_feats=input_dim, dims=[*final_hidden_dims, num_targets], activate_last=False
             )
         else:
             raise ValueError(f"Invalid final MLP type: {final_mlp_type}")
@@ -382,7 +342,7 @@ class CHGNet(MatGLModel):
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
             tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
-            preallocation. Defaults to True.
+                preallocation. Defaults to True.
 
         Returns:
             torch.Tensor: Model output.
@@ -392,9 +352,7 @@ class CHGNet(MatGLModel):
         g.edata["bond_vec"] = bond_vec.to(g.device)
         g.edata["bond_dist"] = bond_dist.to(g.device)
         bond_expansion = self.bond_expansion(bond_dist)
-        smooth_cutoff = polynomial_cutoff(
-            bond_expansion, self.cutoff, self.cutoff_exponent
-        )
+        smooth_cutoff = polynomial_cutoff(bond_expansion, self.cutoff, self.cutoff_exponent)
         g.edata["bond_expansion"] = smooth_cutoff * bond_expansion
 
         # compute state, atom, bond and angle embeddings
@@ -408,37 +366,21 @@ class CHGNet(MatGLModel):
         # create bond graph (line graph) with necessary node and edge data
         if self.use_bond_graph:
             if l_g is None:
-                bond_graph = create_line_graph(
-                    g,
-                    self.three_body_cutoff,
-                    directed=True,
-                    error_handling=error_handling,
-                    tensor_handling=tensor_handling,
-                )
+                bond_graph = create_line_graph(g, self.three_body_cutoff, directed=True, error_handling=error_handling, tensor_handling=tensor_handling)
             else:
                 # need to ensure the line graph matches the graph
-                bond_graph = ensure_line_graph_compatibility(
-                    g, l_g, self.three_body_cutoff, directed=True
-                )
+                bond_graph = ensure_line_graph_compatibility(g, l_g, self.three_body_cutoff, directed=True)
 
             bond_graph.ndata["bond_index"] = bond_graph.ndata["edge_ids"]
-            threebody_bond_expansion = self.threebody_bond_expansion(
-                bond_graph.ndata["bond_dist"]
-            )  # type: ignore[misc]
-            smooth_cutoff = polynomial_cutoff(
-                threebody_bond_expansion, self.three_body_cutoff, self.cutoff_exponent
-            )
-            bond_graph.ndata["bond_expansion"] = (
-                smooth_cutoff * threebody_bond_expansion
-            )
+            threebody_bond_expansion = self.threebody_bond_expansion(bond_graph.ndata["bond_dist"])  # type: ignore[misc]
+            smooth_cutoff = polynomial_cutoff(threebody_bond_expansion, self.three_body_cutoff, self.cutoff_exponent)
+            bond_graph.ndata["bond_expansion"] = smooth_cutoff * threebody_bond_expansion
             # the center atom is the dst atom of the src bond or the reverse (the src atom of the dst bond)
             # need to use "bond_index" just to be safe always
             bond_indices = bond_graph.ndata["bond_index"][bond_graph.edges()[0]]
             bond_graph.edata["center_atom_index"] = g.edges()[1][bond_indices]
             bond_graph.apply_edges(compute_theta)
-            bond_graph.edata["angle_expansion"] = self.angle_expansion(
-                bond_graph.edata["theta"]
-            )  # type: ignore[misc]
+            bond_graph.edata["angle_expansion"] = self.angle_expansion(bond_graph.edata["theta"])  # type: ignore[misc]
             angle_features = self.angle_embedding(bond_graph.edata["angle_expansion"])  # type: ignore[misc]
         else:
             bond_graph = None
@@ -446,14 +388,10 @@ class CHGNet(MatGLModel):
 
         # shared message weights
         atom_bond_weights = (
-            self.atom_bond_weights(g.edata["bond_expansion"])
-            if self.atom_bond_weights is not None
-            else None
+            self.atom_bond_weights(g.edata["bond_expansion"]) if self.atom_bond_weights is not None else None
         )
         bond_bond_weights = (
-            self.bond_bond_weights(g.edata["bond_expansion"])
-            if self.bond_bond_weights is not None
-            else None
+            self.bond_bond_weights(g.edata["bond_expansion"]) if self.bond_bond_weights is not None else None
         )
         threebody_bond_weights = (
             self.threebody_bond_weights(bond_graph.ndata["bond_expansion"])
@@ -464,20 +402,11 @@ class CHGNet(MatGLModel):
         # message passing layers
         for i in range(self.n_blocks - 1):
             atom_features, bond_features, state_attr = self.atom_graph_layers[i](
-                g,
-                atom_features,
-                bond_features,
-                state_attr,
-                atom_bond_weights,
-                bond_bond_weights,
+                g, atom_features, bond_features, state_attr, atom_bond_weights, bond_bond_weights
             )
             if self.use_bond_graph:
                 bond_features, angle_features = self.bond_graph_layers[i](  # type: ignore
-                    bond_graph,
-                    atom_features,
-                    bond_features,
-                    angle_features,
-                    threebody_bond_weights,
+                    bond_graph, atom_features, bond_features, angle_features, threebody_bond_weights
                 )
 
         # site wise target readout
@@ -485,30 +414,19 @@ class CHGNet(MatGLModel):
 
         # last atom graph message passing layer
         atom_features, bond_features, state_attr = self.atom_graph_layers[-1](
-            g,
-            atom_features,
-            bond_features,
-            state_attr,
-            atom_bond_weights,
-            bond_bond_weights,
+            g, atom_features, bond_features, state_attr, atom_bond_weights, bond_bond_weights
         )
 
         # readout
         if self.readout_field == "atom_feat":
             g.ndata["atom_feat"] = self.final_layer(atom_features)
-            structure_properties = readout_nodes(
-                g, "atom_feat", op=self.readout_operation
-            )
+            structure_properties = readout_nodes(g, "atom_feat", op=self.readout_operation)
         elif self.readout_field == "bond_feat":
             g.edata["bond_feat"] = self.final_layer(bond_features)
-            structure_properties = readout_edges(
-                g, "bond_feat", op=self.readout_operation
-            )
+            structure_properties = readout_edges(g, "bond_feat", op=self.readout_operation)
         else:  # self.readout_field == "angle_feat":
             bond_graph.edata["angle_feat"] = self.final_layer(angle_features)
-            structure_properties = readout_edges(
-                bond_graph, "angle_feat", op=self.readout_operation
-            )
+            structure_properties = readout_edges(bond_graph, "angle_feat", op=self.readout_operation)
 
         structure_properties = torch.squeeze(structure_properties)
         return structure_properties
@@ -530,7 +448,7 @@ class CHGNet(MatGLModel):
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
             tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
-            preallocation. Defaults to True.
+                preallocation. Defaults to True.
 
         Returns:
             output (torch.tensor): output property
@@ -538,20 +456,11 @@ class CHGNet(MatGLModel):
         if graph_converter is None:
             from matgl.ext.pymatgen import Structure2Graph
 
-            graph_converter = Structure2Graph(
-                element_types=self.element_types, cutoff=self.cutoff
-            )
+            graph_converter = Structure2Graph(element_types=self.element_types, cutoff=self.cutoff)
 
         graph, lattice, state_feats_default = graph_converter.get_graph(structure)
-        graph.edata["pbc_offshift"] = torch.matmul(
-            graph.edata["pbc_offset"], lattice[0]
-        )
+        graph.edata["pbc_offshift"] = torch.matmul(graph.edata["pbc_offset"], lattice[0])
         graph.ndata["pos"] = graph.ndata["frac_coords"] @ lattice[0]
         if state_feats is None:
             state_feats = torch.tensor(state_feats_default)
-        return self(
-            g=graph,
-            state_attr=state_feats,
-            error_handling=error_handling,
-            tensor_handling=tensor_handling,
-        )
+        return self(g=graph, state_attr=state_feats, error_handling=error_handling, tensor_handling=tensor_handling)
