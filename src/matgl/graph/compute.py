@@ -80,6 +80,7 @@ def create_line_graph(
     threebody_cutoff: float,
     directed: bool = False,
     error_handling: bool = False,
+    tensor_handling: bool = True,
     numerical_noise: float = 1e-6,
 ) -> dgl.DGLGraph:
     """
@@ -92,6 +93,8 @@ def create_line_graph(
             Default = False (M3Gnet)
         error_handling: whether to handle exception due to numerical error
             Default = False
+        tensor_handling: whether to handle tensor reallocation due to mismatch in preallocation
+            Default = True
         numerical_noise: a tiny noise added to lg construction to avoid numerical error
             Default = 1e-7
 
@@ -104,7 +107,7 @@ def create_line_graph(
         )
         try:
             lg = (
-                _create_directed_line_graph(graph_with_three_body)
+                _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
                 if directed
                 else _compute_3body(graph_with_three_body)
             )
@@ -121,7 +124,7 @@ def create_line_graph(
                 g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff + numerical_noise
             )
             lg = (
-                _create_directed_line_graph(graph_with_three_body)
+                _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
                 if directed
                 else _compute_3body(graph_with_three_body)
             )
@@ -131,7 +134,7 @@ def create_line_graph(
             g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff
         )
         lg = (
-            _create_directed_line_graph(graph_with_three_body, mismatch_handling=error_handling)
+            _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
             if directed
             else _compute_3body(graph_with_three_body)
         )
@@ -261,13 +264,13 @@ def _compute_3body(g: dgl.DGLGraph):
 
 def _create_directed_line_graph(
     graph: dgl.DGLGraph,
-    mismatch_handling: bool = True,
+    tensor_handling: bool = True,
 ) -> dgl.DGLGraph:
     """Creates a line graph from a graph, considers periodic boundary conditions.
 
     Args:
         graph: DGL graph representing atom graph
-        mismatch_handling: passthrough from error_handling, allows tensor reallocation
+        tensor_handling: passthrough, allows tensor reallocation
 
     Returns:
         line_graph: DGL line graph of pruned graph to three body cutoff
@@ -318,7 +321,7 @@ def _create_directed_line_graph(
         # only activates if the allocation buffer is not enough
         # and if error_handling is active
         except RuntimeError as e:
-            if not mismatch_handling:
+            if not tensor_handling:
                 raise
             if "must match the existing size" in str(e):
                 xs = int(lg_src.numel() * 1.2)
