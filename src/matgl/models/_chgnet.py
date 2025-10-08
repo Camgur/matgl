@@ -366,8 +366,13 @@ class CHGNet(MatGLModel):
         # create bond graph (line graph) with necessary node and edge data
         if self.use_bond_graph:
             if l_g is None:
-                bond_graph = create_line_graph(g, self.three_body_cutoff, directed=True, error_handling=error_handling,
-                                               tensor_handling=tensor_handling)
+                bond_graph = create_line_graph(
+                    g,
+                    self.three_body_cutoff,
+                    directed=True,
+                    error_handling=error_handling,
+                    tensor_handling=tensor_handling,
+                )
             else:
                 # need to ensure the line graph matches the graph
                 bond_graph = ensure_line_graph_compatibility(g, l_g, self.three_body_cutoff, directed=True)
