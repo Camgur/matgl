@@ -473,5 +473,5 @@ class CHGNet(MatGLModel):
             g=graph,
             state_attr=state_feats,
             error_handling=error_handling,
-            tensor_handling=tensor_handling
+            tensor_handling=tensor_handling,
         )
