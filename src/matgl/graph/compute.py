@@ -281,13 +281,8 @@ def _create_directed_line_graph(
         all_indices = torch.arange(graph.number_of_nodes(), device=graph.device).unsqueeze(dim=0)
         num_bonds_per_atom = torch.count_nonzero(src_indices.unsqueeze(dim=1) == all_indices, dim=0)
         num_edges_per_bond = (num_bonds_per_atom - 1).repeat_interleave(num_bonds_per_atom)
-        total_edges_per_bond = num_edges_per_bond.sum()
-
-        # apply an adaptive buffer of ten percent
-        # this will be trimmed, little efficiency impact
-        buffered_edges = max(10, int(0.10 * total_edges_per_bond))
-        lg_src = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
-        lg_dst = torch.empty(buffered_edges + total_edges_per_bond, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_src = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_dst = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
 
         incoming_edges = src_indices.unsqueeze(1) == dst_indices
         is_self_edge = src_indices == dst_indices
