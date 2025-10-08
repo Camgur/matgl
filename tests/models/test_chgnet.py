@@ -105,8 +105,9 @@ class TestCHGNet:
 
         dummy_chgnet = CHGNet(cutoff=6.0, threebody_cutoff=3.0)
         # This structure triggers RuntimeError without error handling
+        # Added tensor_handling=False to prevent tensor reallocation
         with pytest.raises(RuntimeError):
-            dummy_chgnet.predict_structure(structure, error_handling=False)
+            dummy_chgnet.predict_structure(structure, error_handling=False, tensor_handling=False)
 
         # With error handling it only prints warning
         with pytest.warns(RuntimeWarning):
