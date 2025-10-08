@@ -315,7 +315,8 @@ def _create_directed_line_graph(
                 xs = int(lg_src.numel() * 1.2)
                 lg_src = torch.cat([lg_src, torch.empty(xs - lg_src.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
                 lg_dst = torch.cat([lg_dst, torch.empty(xs - lg_dst.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
-                lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+                lg_src[n : n + lg_src_ns.numel()] = lg_src_ns
+                lg_dst[n : n + lg_dst_ns.numel()] = lg_dst_ns
             else:
                 raise
 
