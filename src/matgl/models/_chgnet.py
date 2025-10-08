@@ -464,5 +464,9 @@ class CHGNet(MatGLModel):
         graph.ndata["pos"] = graph.ndata["frac_coords"] @ lattice[0]
         if state_feats is None:
             state_feats = torch.tensor(state_feats_default)
-        return self(g=graph, state_attr=state_feats,
-            error_handling=error_handling, tensor_handling=tensor_handling)
+        return self(
+            g=graph,
+            state_attr=state_feats,
+            error_handling=error_handling,
+            tensor_handling=tensor_handling
+            )
