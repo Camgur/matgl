@@ -130,7 +130,11 @@ def create_line_graph(
         graph_with_three_body = prune_edges_by_features(
             g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff
         )
-        lg = _create_directed_line_graph(graph_with_three_body) if directed else _compute_3body(graph_with_three_body)
+        lg = (
+            _create_directed_line_graph(graph_with_three_body, mismatch_handling=False)
+            if directed
+            else _compute_3body(graph_with_three_body)
+        )
         return lg
 
 
@@ -257,6 +261,7 @@ def _compute_3body(g: dgl.DGLGraph):
 
 def _create_directed_line_graph(
     graph: dgl.DGLGraph,
+    mismatch_handling=True,
 ) -> dgl.DGLGraph:
     """Creates a line graph from a graph, considers periodic boundary conditions.
 
@@ -310,7 +315,10 @@ def _create_directed_line_graph(
             lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
         # fixes tensor allocation crash with dynamic resizing
         # only activates if the allocation buffer is not enough
+        # and if error_handling is active
         except RuntimeError as e:
+            if not mismatch_handling:
+                raise
             if "must match the existing size" in str(e):
                 xs = int(lg_src.numel() * 1.2)
                 lg_src = torch.cat([lg_src, torch.empty(xs - lg_src.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
