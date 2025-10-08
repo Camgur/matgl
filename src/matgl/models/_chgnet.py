@@ -372,7 +372,7 @@ class CHGNet(MatGLModel):
                     directed=True,
                     error_handling=error_handling,
                     tensor_handling=tensor_handling
-                    )
+                )
             else:
                 # need to ensure the line graph matches the graph
                 bond_graph = ensure_line_graph_compatibility(g, l_g, self.three_body_cutoff, directed=True)
@@ -474,4 +474,4 @@ class CHGNet(MatGLModel):
             state_attr=state_feats,
             error_handling=error_handling,
             tensor_handling=tensor_handling
-            )
+        )
