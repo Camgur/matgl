@@ -342,7 +342,7 @@ class CHGNet(MatGLModel):
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
             tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
-            preallocation. Defaults to True.
+                preallocation. Defaults to True.
 
         Returns:
             torch.Tensor: Model output.
@@ -371,8 +371,8 @@ class CHGNet(MatGLModel):
                     self.three_body_cutoff,
                     directed=True,
                     error_handling=error_handling,
-                    tensor_handling=tensor_handling
-                    )
+                    tensor_handling=tensor_handling,
+                )
             else:
                 # need to ensure the line graph matches the graph
                 bond_graph = ensure_line_graph_compatibility(g, l_g, self.three_body_cutoff, directed=True)
@@ -454,7 +454,7 @@ class CHGNet(MatGLModel):
             error_handling (bool, optional): Whether to allow numerical tolerance when an error occurs in
                 l_g construction. Defaults to True.
             tensor_handling: whether to handle tensor reallocation due to mismatch in tensor
-            preallocation. Defaults to True.
+                preallocation. Defaults to True.
 
         Returns:
             output (torch.tensor): output property
@@ -469,9 +469,4 @@ class CHGNet(MatGLModel):
         graph.ndata["pos"] = graph.ndata["frac_coords"] @ lattice[0]
         if state_feats is None:
             state_feats = torch.tensor(state_feats_default)
-        return self(
-            g=graph,
-            state_attr=state_feats,
-            error_handling=error_handling,
-            tensor_handling=tensor_handling
-            )
+        return self(g=graph, state_attr=state_feats, error_handling=error_handling, tensor_handling=tensor_handling)

@@ -80,6 +80,7 @@ def create_line_graph(
     threebody_cutoff: float,
     directed: bool = False,
     error_handling: bool = False,
+    tensor_handling: bool = True,
     numerical_noise: float = 1e-6,
 ) -> dgl.DGLGraph:
     """
@@ -92,6 +93,8 @@ def create_line_graph(
             Default = False (M3Gnet)
         error_handling: whether to handle exception due to numerical error
             Default = False
+        tensor_handling: whether to handle tensor reallocation due to mismatch in preallocation
+            Default = True
         numerical_noise: a tiny noise added to lg construction to avoid numerical error
             Default = 1e-7
 
@@ -104,7 +107,7 @@ def create_line_graph(
         )
         try:
             lg = (
-                _create_directed_line_graph(graph_with_three_body)
+                _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
                 if directed
                 else _compute_3body(graph_with_three_body)
             )
@@ -121,7 +124,7 @@ def create_line_graph(
                 g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff + numerical_noise
             )
             lg = (
-                _create_directed_line_graph(graph_with_three_body)
+                _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
                 if directed
                 else _compute_3body(graph_with_three_body)
             )
@@ -130,7 +133,11 @@ def create_line_graph(
         graph_with_three_body = prune_edges_by_features(
             g, feat_name="bond_dist", condition=lambda x: x > threebody_cutoff
         )
-        lg = _create_directed_line_graph(graph_with_three_body) if directed else _compute_3body(graph_with_three_body)
+        lg = (
+            _create_directed_line_graph(graph_with_three_body, tensor_handling=tensor_handling)
+            if directed
+            else _compute_3body(graph_with_three_body)
+        )
         return lg
 
 
@@ -257,11 +264,13 @@ def _compute_3body(g: dgl.DGLGraph):
 
 def _create_directed_line_graph(
     graph: dgl.DGLGraph,
+    tensor_handling: bool = True,
 ) -> dgl.DGLGraph:
     """Creates a line graph from a graph, considers periodic boundary conditions.
 
     Args:
         graph: DGL graph representing atom graph
+        tensor_handling: passthrough, allows tensor reallocation
 
     Returns:
         line_graph: DGL line graph of pruned graph to three body cutoff
@@ -272,12 +281,8 @@ def _create_directed_line_graph(
         all_indices = torch.arange(graph.number_of_nodes(), device=graph.device).unsqueeze(dim=0)
         num_bonds_per_atom = torch.count_nonzero(src_indices.unsqueeze(dim=1) == all_indices, dim=0)
         num_edges_per_bond = (num_bonds_per_atom - 1).repeat_interleave(num_bonds_per_atom)
-        total_edges_per_bond = num_edges_per_bond.sum()
-
-        # apply an adaptive buffer of at least 8 extra allocations (or 1% of total edges per bond)
-        buffered_edges = max(8, int(0.01 * total_edges_per_bond)) + total_edges_per_bond  # small safety margin to catch overallocations
-        lg_src = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
-        lg_dst = torch.empty(buffered_edges, dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_src = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
+        lg_dst = torch.empty(num_edges_per_bond.sum(), dtype=matgl.int_th, device=graph.device)  # type:ignore[call-overload]
 
         incoming_edges = src_indices.unsqueeze(1) == dst_indices
         is_self_edge = src_indices == dst_indices
@@ -304,11 +309,26 @@ def _create_directed_line_graph(
         lg_dst_ns = edge_inds_ns.repeat_interleave(num_edges_per_bond[not_self_edge])
 
         # fill remaining unallocated space
-        n_xs = lg_dst_ns.numel()
-        lg_src[n:n + n_xs], lg_dst[n:n + n_xs] = lg_src_ns, lg_dst_ns
+        # try normal fill, expand if necessary (a little slower but rare)
+        try:
+            lg_src[n:], lg_dst[n:] = lg_src_ns, lg_dst_ns
+        # fixes tensor allocation crash with dynamic resizing
+        # only activates if the allocation buffer is not enough
+        # and if error_handling is active
+        except RuntimeError as e:
+            if not tensor_handling:
+                raise
+            if "must match the existing size" in str(e):
+                xs = int(lg_src.numel() * 1.2)
+                lg_src = torch.cat([lg_src, torch.empty(xs - lg_src.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
+                lg_dst = torch.cat([lg_dst, torch.empty(xs - lg_dst.numel(), dtype=matgl.int_th, device=graph.device)])  # type:ignore[call-overload]
+                lg_src[n : n + lg_src_ns.numel()] = lg_src_ns
+                lg_dst[n : n + lg_dst_ns.numel()] = lg_dst_ns
+            else:
+                raise
 
         # Patch to ensure alignment
-        # Trims unused or overfilled arrays
+        # Trims unused or overfilled arrays (fast)
         n_filled = min(lg_src.numel(), max(n + lg_dst_ns.numel(), 0))
         if n_filled < lg_src.numel():
             lg_src = lg_src[:n_filled]
